@@ -16,6 +16,11 @@ export interface Product {
    * Only present for real vendor-created products; absent (undefined)
    * for the (currently empty) static mock catalogue. */
   attributes?: Record<string, string>;
+  /** Real vendor-entered description, when this product came from a real
+   * vendor rather than the (currently empty) static catalog. Undefined
+   * for static-catalog items, which fall back to a generic blurb instead
+   * since they were never given real descriptions. */
+  description?: string;
 }
 
 interface RawProduct {

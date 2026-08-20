@@ -1,14 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, radius, spacing, typography } from "@/theme/colors";
 import { useAppTheme } from "@/theme/useAppTheme";
 import type { AppDispatch, RootState } from "@/store/store";
 import { clearCart } from "@/store/slices/cartSlice";
-import { placeOrder } from "@/store/slices/ordersSlice";
+import { createOrderRemote } from "@/store/slices/ordersSlice";
 import { findCoupon, evaluateCoupon } from "@/data/coupons";
 
 const FREE_DELIVERY_THRESHOLD = 500;
@@ -59,6 +59,7 @@ export default function CheckoutScreen() {
   const [paymentMethod, setPaymentMethod] = useState<string>(""); // e.g. "upi:gpay", "upi:custom", "card:<id>", "cod"
   const [upiId, setUpiId] = useState("");
   const [placing, setPlacing] = useState(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
 
   const itemsTotal = cartItems.reduce((sum, i) => sum + i.price * i.qty, 0);
   const deliveryCharge = itemsTotal >= FREE_DELIVERY_THRESHOLD || itemsTotal === 0 ? 0 : DELIVERY_CHARGE;
@@ -99,11 +100,11 @@ export default function CheckoutScreen() {
       (paymentMethod.startsWith("upi:") && paymentMethod !== "upi:custom") ||
       paymentMethod.startsWith("card:"));
 
-  const onPlaceOrder = () => {
+  const onPlaceOrder = async () => {
     if (!canPlaceOrder || !selectedAddress) return;
     setPlacing(true);
-    const action = dispatch(
-      placeOrder({
+    const result = await dispatch(
+      createOrderRemote({
         items: cartItems.map((i) => ({
           id: i.id,
           title: i.title,
@@ -121,8 +122,13 @@ export default function CheckoutScreen() {
         paymentMethod: paymentLabel(),
       })
     );
-    dispatch(clearCart());
-    router.replace(`/order-success?orderId=${action.payload.id}`);
+    setPlacing(false);
+    if (createOrderRemote.fulfilled.match(result)) {
+      dispatch(clearCart());
+      router.replace(`/order-success?orderId=${result.payload.id}`);
+    } else {
+      setOrderError((result.payload as string) ?? "Could not place order. Please try again.");
+    }
   };
 
   return (
@@ -232,19 +238,26 @@ export default function CheckoutScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <View>
-          <Text style={styles.totalLabel}>Total Amount</Text>
-          <Text style={styles.totalValue}>₹{grandTotal.toLocaleString("en-IN")}</Text>
+        {orderError && <Text style={styles.orderErrorText}>{orderError}</Text>}
+        <View style={styles.footerRow}>
+          <View>
+            <Text style={styles.totalLabel}>Total Amount</Text>
+            <Text style={styles.totalValue}>₹{grandTotal.toLocaleString("en-IN")}</Text>
+          </View>
+          <Pressable
+            style={[styles.payBtn, (!canPlaceOrder || placing) && styles.btnDisabled]}
+            disabled={!canPlaceOrder || placing}
+            onPress={onPlaceOrder}
+          >
+            {placing ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.payBtnText}>
+                {paymentMethod === "cod" ? "Place Order" : `Pay ₹${grandTotal.toLocaleString("en-IN")}`}
+              </Text>
+            )}
+          </Pressable>
         </View>
-        <Pressable
-          style={[styles.payBtn, !canPlaceOrder && styles.btnDisabled]}
-          disabled={!canPlaceOrder || placing}
-          onPress={onPlaceOrder}
-        >
-          <Text style={styles.payBtnText}>
-            {paymentMethod === "cod" ? "Place Order" : `Pay ₹${grandTotal.toLocaleString("en-IN")}`}
-          </Text>
-        </Pressable>
       </View>
     </SafeAreaView>
   );
@@ -306,14 +319,17 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     padding: spacing.lg,
     borderTopWidth: 1,
     borderTopColor: colors.line,
     backgroundColor: colors.white,
   },
+  footerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  orderErrorText: { color: "#d32f2f", fontSize: 12, marginBottom: spacing.sm, textAlign: "center" },
   totalLabel: { fontSize: 11, color: colors.inkSoft },
   totalValue: { fontSize: 18, fontWeight: "800" },
   payBtn: { backgroundColor: colors.green, paddingVertical: 12, paddingHorizontal: 28, borderRadius: radius.sm },

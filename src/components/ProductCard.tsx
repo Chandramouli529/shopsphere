@@ -9,6 +9,7 @@ import type { AppDispatch, RootState } from "@/store/store";
 import { addItem, setPendingItem } from "@/store/slices/cartSlice";
 import { parsePrice } from "@/utils/price";
 import ProductImage from "@/components/ProductImage";
+import AnimatedPressable from "@/components/AnimatedPressable";
 
 type Size = "sm" | "lg" | "grid3";
 
@@ -83,7 +84,7 @@ export default function ProductCard({
   };
 
   return (
-    <Pressable style={[styles.card, { width: cfg.card }]} onPress={onPress}>
+    <AnimatedPressable style={[styles.card, { width: cfg.card }]} onPress={onPress}>
       <View style={[styles.thumb, { width: cfg.thumb, height: cfg.thumb }]}>
         <ProductImage uri={image} emoji={emoji} size={cfg.thumb} emojiSize={cfg.emoji} borderRadius={radius.md} />
         {discountLabel && (
@@ -92,7 +93,8 @@ export default function ProductCard({
           </View>
         )}
         {showAddToCart && (
-          <Pressable
+          <AnimatedPressable
+            scaleTo={0.85}
             style={[
               styles.addBtn,
               { width: cfg.addBtn, height: cfg.addBtn, borderRadius: cfg.addBtn / 2, backgroundColor: theme.primary },
@@ -101,7 +103,7 @@ export default function ProductCard({
             hitSlop={6}
           >
             <Ionicons name="add" size={cfg.addIcon} color="#fff" />
-          </Pressable>
+          </AnimatedPressable>
         )}
       </View>
       <Text style={[styles.title, { fontSize: cfg.title }]} numberOfLines={1}>
@@ -121,7 +123,7 @@ export default function ProductCard({
       <Text style={[styles.subtitle, { fontSize: cfg.subtitle, color: theme.primary }]} numberOfLines={1}>
         {subtitle}
       </Text>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 

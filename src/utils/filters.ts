@@ -47,17 +47,55 @@ export const SORT_OPTIONS: { label: string; value: SortOption }[] = [
   { label: "Discount", value: "discount" },
 ];
 
-/** Attribute keys that exist in the schema but aren't useful as
- * multi-select filter dimensions — numeric pricing/stock fields (better
- * suited to the dedicated Price/Discount/Availability filters), and
- * free-text fields too unstructured to filter by (size charts, model
- * numbers, specs, descriptions). Everything else becomes a filter tab
- * automatically, driven entirely by data/vendorProductAttributes.ts. */
-const NON_FILTERABLE_ATTRIBUTE_KEYS = new Set([
+// Fields that should never be treated as a category-specific "extra"
+// attribute anywhere in the customer-facing UI — generic fields that
+// are already shown in their own dedicated spot (title, price, images),
+// plus vendor/backend-internal bookkeeping (stock thresholds, database
+// ids, timestamps). This matters because mapRemoteProduct
+// (vendorProductsSlice.ts) stores the ENTIRE raw backend response as
+// `attributes`, not just the category-specific extra fields — without
+// this filter, things like the database _id or low-stock threshold
+// would otherwise leak into both the filter sidebar and the product
+// detail page's spec list.
+const GENERIC_HIDDEN_ATTRIBUTE_KEYS = new Set([
   "mrp",
+  "sellingPrice",
   "discountPercentage",
+  "stock",
   "lowStockLimit",
   "criticalStockLimit",
+  "productName",
+  "title",
+  "titleDescription",
+  "productDescription",
+  "description",
+  "category",
+  "imageUrls",
+  "images",
+  "coverImages",
+  "_id",
+  "id",
+  "vendorId",
+  "createdAt",
+  "updatedAt",
+  "__v",
+  "success",
+  "message",
+]);
+
+/** Same as GENERIC_HIDDEN_ATTRIBUTE_KEYS — exported under a name that's
+ * clearer at each call site (product/[id].tsx uses this one). */
+export const CUSTOMER_HIDDEN_ATTRIBUTE_KEYS = GENERIC_HIDDEN_ATTRIBUTE_KEYS;
+
+/** Attribute keys that exist in the schema but aren't useful as
+ * multi-select filter dimensions — everything in
+ * GENERIC_HIDDEN_ATTRIBUTE_KEYS, plus free-text fields too unstructured
+ * to filter by (size charts, model numbers, specs) and fields better
+ * suited to their own dedicated filter (expiry date, publication date).
+ * Everything else becomes a filter tab automatically, driven entirely
+ * by data/vendorProductAttributes.ts. */
+const NON_FILTERABLE_ATTRIBUTE_KEYS = new Set([
+  ...GENERIC_HIDDEN_ATTRIBUTE_KEYS,
   "sizeChart",
   "specifications",
   "modelNumber",
@@ -77,8 +115,9 @@ const NON_FILTERABLE_ATTRIBUTE_KEYS = new Set([
   "pages",
 ]);
 
-// Human-readable labels for every known attribute key across all
-// category schemas, used when rendering that key as a filter tab.
+// Human-readable labels for every known attribute key across all 14
+// category schemas — used both for filter tabs and for the "Product
+// Details" spec rows on the customer-facing product page.
 const ATTRIBUTE_LABELS: Record<string, string> = {
   brandName: "Brand",
   subCategory: "Sub Category",
@@ -95,11 +134,28 @@ const ATTRIBUTE_LABELS: Record<string, string> = {
   ageGroup: "Age Group",
   gender: "Gender",
   stockStatus: "Stock Status",
-  status: "Status",
+  status: "Availability",
   finishType: "Finish Type",
   bookType: "Book Type",
   language: "Language",
   format: "Format",
+  modelNumber: "Model Number",
+  specifications: "Specifications",
+  warranty: "Warranty",
+  quantity: "Quantity",
+  unit: "Unit",
+  lengthCm: "Length (cm)",
+  widthCm: "Width (cm)",
+  heightCm: "Height (cm)",
+  seatingCapacity: "Seating Capacity",
+  authorName: "Author",
+  publisher: "Publisher",
+  publicationDate: "Publication Date",
+  edition: "Edition",
+  pages: "Pages",
+  manufacturer: "Manufacturer",
+  expiryDate: "Expiry Date",
+  sizeChart: "Size Chart",
 };
 
 export function attributeLabel(key: string): string {

@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import * as SecureStore from "expo-secure-store";
+import { safeSetItem, safeGetItem, safeDeleteItem } from "@/services/secureStorage";
 import { vendorApi, VENDOR_TOKEN_KEY, type VendorData } from "@/services/vendorApi";
 import { isEmailVerified, markEmailVerified } from "@/services/vendorVerifiedEmails";
 
@@ -22,12 +22,6 @@ interface VendorAuthState {
    * verification succeeds (first-time vendor). */
   step: "email" | "otp" | "password";
   pendingEmail: string | null;
-  /** True when this login skipped the real OTP screen (returning
-   * vendor, already verified before) — used to decide whether to try
-   * re-verifying with the password value before login, since the
-   * backend's /vendor/login appears to require a preceding /vendor/verify
-   * call in the same session (confirmed via diagnostic logging). */
-  skippedOtp: boolean;
   status: "idle" | "loading" | "authenticated";
   vendor: VendorSession | null;
   accessToken: string | null;
@@ -37,13 +31,18 @@ interface VendorAuthState {
 const initialState: VendorAuthState = {
   step: "email",
   pendingEmail: null,
-  skippedOtp: false,
   status: "idle",
   vendor: null,
   accessToken: null,
   error: null,
 };
 
+// Confirmed via a real raw-response dump: /vendor/login returns
+// { data: { businessType, email, shopName, status, vendorId,
+// vendorName, ... }, message, success, token } — the vendor's actual
+// fields live under `data`, not at the top level and not under `.vendor`
+// or `.user`. This mapper checks all of those, in that priority order,
+// so it keeps working if the shape ever changes back.
 function mapVendorSession(vendor: VendorData): VendorSession {
   return {
     id: vendor._id,
@@ -96,57 +95,24 @@ export const vendorVerifyOtp = createAsyncThunk(
 /** Step 3: enters password and logs in for real. Reached either right
  * after email (returning vendor) or right after OTP (first-time
  * vendor) — same thunk either way, since by this point OTP (if needed)
- * is already done. Blocks login entirely if admin hasn't approved the
- * vendor account yet. */
+ * is already done. Just one call to POST /vendor/login — confirmed via
+ * real testing that no preceding /vendor/verify call is needed for a
+ * returning vendor. */
 export const vendorLoginWithPassword = createAsyncThunk(
   "vendorAuth/loginWithPassword",
   async (password: string, { getState, rejectWithValue }) => {
     const state = getState() as { vendorAuth: VendorAuthState };
     const email = state.vendorAuth.pendingEmail;
-    const skippedOtp = state.vendorAuth.skippedOtp;
     if (!email) {
       return rejectWithValue("Your session expired. Please start again.");
     }
 
-    // Diagnostic confirmed the backend's /vendor/login 404s ("Vendor not
-    // found") when called without a /vendor/verify in the same session —
-    // for a returning login (no real OTP was shown), try verifying with
-    // the password value in its place first. Best-effort: if this call
-    // itself fails, we still proceed to attempt login rather than
-    // blocking on it, since it's a workaround, not a confirmed contract.
-    if (skippedOtp) {
-      try {
-        if (__DEV__) {
-          console.warn(`[vendorAuthSlice] Returning login — calling POST /vendor/verify with password as otp for email="${email}"`);
-        }
-        await vendorApi.verify({ email, otp: password });
-      } catch (verifyError: any) {
-        if (__DEV__) {
-          console.warn(
-            "[vendorAuthSlice] Pre-login /vendor/verify (password-as-otp) failed — proceeding to /vendor/login anyway. Status:",
-            verifyError?.response?.status,
-            "Body:",
-            verifyError?.response?.data
-          );
-        }
-      }
-    }
-
     try {
-      if (__DEV__) {
-        console.warn(
-          `[vendorAuthSlice] Calling POST /vendor/login with email="${email}" (length ${email.length}), password length ${password.length}`
-        );
-      }
       const response = await vendorApi.login({ email, password });
-      const vendorData = response.vendor || response.user || response;
-
-      if (__DEV__) {
-        console.warn("[vendorAuthSlice] Raw /vendor/login response.vendor (or .user, or root):", vendorData);
-      }
+      const vendorData: VendorData = response.vendor || response.user || response.data || response;
 
       if (response.token) {
-        await SecureStore.setItemAsync(VENDOR_TOKEN_KEY, response.token);
+        await safeSetItem(VENDOR_TOKEN_KEY, response.token);
       }
       const vendor = mapVendorSession(vendorData);
       // The email you actually logged in with is always known, even if
@@ -155,14 +121,6 @@ export const vendorLoginWithPassword = createAsyncThunk(
       if (!vendor.email) vendor.email = email;
       return { vendor, token: response.token as string };
     } catch (error: any) {
-      if (__DEV__) {
-        console.warn(
-          "[vendorAuthSlice] /vendor/login failed. HTTP status:",
-          error?.response?.status,
-          "Response body:",
-          error?.response?.data
-        );
-      }
       return rejectWithValue(
         error?.response?.data?.message || error?.message || "Login failed"
       );
@@ -171,12 +129,12 @@ export const vendorLoginWithPassword = createAsyncThunk(
 );
 
 export const vendorRestoreSession = createAsyncThunk("vendorAuth/restoreSession", async () => {
-  const token = await SecureStore.getItemAsync(VENDOR_TOKEN_KEY);
+  const token = await safeGetItem(VENDOR_TOKEN_KEY);
   return { token };
 });
 
 export const vendorLogout = createAsyncThunk("vendorAuth/logout", async () => {
-  await SecureStore.deleteItemAsync(VENDOR_TOKEN_KEY);
+  await safeDeleteItem(VENDOR_TOKEN_KEY);
 });
 
 const vendorAuthSlice = createSlice({
@@ -186,7 +144,6 @@ const vendorAuthSlice = createSlice({
     resetVendorAuthFlow(state) {
       state.step = "email";
       state.pendingEmail = null;
-      state.skippedOtp = false;
       state.error = null;
     },
   },
@@ -195,7 +152,6 @@ const vendorAuthSlice = createSlice({
       .addCase(vendorEnterEmail.fulfilled, (state, action) => {
         state.step = action.payload.alreadyVerified ? "password" : "otp";
         state.pendingEmail = action.payload.email;
-        state.skippedOtp = action.payload.alreadyVerified;
         state.error = null;
       })
       .addCase(vendorEnterEmail.rejected, (state, action) => {
@@ -208,7 +164,6 @@ const vendorAuthSlice = createSlice({
       .addCase(vendorVerifyOtp.fulfilled, (state) => {
         state.status = "idle";
         state.step = "password";
-        state.skippedOtp = false;
       })
       .addCase(vendorVerifyOtp.rejected, (state, action) => {
         state.status = "idle";
@@ -235,7 +190,6 @@ const vendorAuthSlice = createSlice({
         state.accessToken = null;
         state.step = "email";
         state.pendingEmail = null;
-        state.skippedOtp = false;
       });
   },
 });

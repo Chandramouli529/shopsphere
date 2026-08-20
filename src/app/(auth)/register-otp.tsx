@@ -18,6 +18,8 @@ import { useAppTheme } from "@/theme/useAppTheme";
 import type { AppDispatch, RootState } from "@/store/store";
 import { verifyRegistrationOtp, cancelRegistration } from "@/store/slices/authSlice";
 import { authApi } from "@/services/authApi";
+import AnimatedPressable from "@/components/AnimatedPressable";
+import FadeInView from "@/components/FadeInView";
 
 const OTP_LENGTH = 6;
 const OTP_VALIDITY_MS = 5 * 60 * 1000; // 5 minutes
@@ -110,67 +112,73 @@ export default function RegisterOtpScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
       <View style={[styles.header, { backgroundColor: theme.primary }]}>
-        <Pressable style={styles.close} onPress={onCancel}>
+        <AnimatedPressable scaleTo={0.85} style={styles.close} onPress={onCancel}>
           <Ionicons name="arrow-back" size={22} color="#fff" />
-        </Pressable>
-        <View style={styles.logoRow}>
+        </AnimatedPressable>
+        <FadeInView slideDistance={0} style={styles.logoRow}>
           <Ionicons name="flash" size={18} color={theme.secondary} />
           <Text style={styles.logoText}>ShopSphere</Text>
-        </View>
+        </FadeInView>
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <View style={styles.body}>
-          <Text style={styles.title}>Verify your email</Text>
-          <Text style={styles.fieldLabel}>
-            Enter the 6-digit code sent to {pendingEmail ?? "your email"}
-          </Text>
-
-          <View style={styles.otpRow}>
-            {digits.map((d, idx) => (
-              <TextInput
-                key={idx}
-                ref={(ref) => {
-                  inputs.current[idx] = ref;
-                }}
-                style={[styles.otpBox, { borderColor: expired ? "#d32f2f" : theme.primary }]}
-                value={d}
-                onChangeText={(v) => setDigit(idx, v)}
-                onKeyPress={({ nativeEvent }) => onKeyPress(idx, nativeEvent.key)}
-                keyboardType="number-pad"
-                maxLength={1}
-                autoFocus={idx === 0}
-                editable={!expired}
-              />
-            ))}
-          </View>
-
-          {!expired ? (
-            <View style={styles.timerRow}>
-              <Ionicons name="time-outline" size={14} color={remainingMs < 30000 ? "#d32f2f" : "#777"} />
-              <Text style={[styles.timerText, remainingMs < 30000 && { color: "#d32f2f" }]}>
-                Code expires in {formatCountdown(remainingMs)}
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.expiredRow}>
-              <Ionicons name="alert-circle" size={14} color="#d32f2f" />
-              <Text style={styles.expiredText}>This code has expired.</Text>
-            </View>
-          )}
-
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-          <Text style={styles.resend}>
-            {expired ? "Get a new code:" : "Didn't receive the code?"}{" "}
-            <Text style={[styles.resendLink, { color: theme.primary }]} onPress={onResend}>
-              {resending ? "Sending…" : "Resend OTP"}
+          <FadeInView delay={0}>
+            <Text style={styles.title}>Verify your email</Text>
+            <Text style={styles.fieldLabel}>
+              Enter the 6-digit code sent to {pendingEmail ?? "your email"}
             </Text>
-          </Text>
+          </FadeInView>
+
+          <FadeInView delay={80}>
+            <View style={styles.otpRow}>
+              {digits.map((d, idx) => (
+                <TextInput
+                  key={idx}
+                  ref={(ref) => {
+                    inputs.current[idx] = ref;
+                  }}
+                  style={[styles.otpBox, { borderColor: expired ? "#d32f2f" : theme.primary }]}
+                  value={d}
+                  onChangeText={(v) => setDigit(idx, v)}
+                  onKeyPress={({ nativeEvent }) => onKeyPress(idx, nativeEvent.key)}
+                  keyboardType="number-pad"
+                  maxLength={1}
+                  autoFocus={idx === 0}
+                  editable={!expired}
+                />
+              ))}
+            </View>
+          </FadeInView>
+
+          <FadeInView delay={140}>
+            {!expired ? (
+              <View style={styles.timerRow}>
+                <Ionicons name="time-outline" size={14} color={remainingMs < 30000 ? "#d32f2f" : "#777"} />
+                <Text style={[styles.timerText, remainingMs < 30000 && { color: "#d32f2f" }]}>
+                  Code expires in {formatCountdown(remainingMs)}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.expiredRow}>
+                <Ionicons name="alert-circle" size={14} color="#d32f2f" />
+                <Text style={styles.expiredText}>This code has expired.</Text>
+              </View>
+            )}
+
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+            <Text style={styles.resend}>
+              {expired ? "Get a new code:" : "Didn't receive the code?"}{" "}
+              <Text style={[styles.resendLink, { color: theme.primary }]} onPress={onResend}>
+                {resending ? "Sending…" : "Resend OTP"}
+              </Text>
+            </Text>
+          </FadeInView>
         </View>
 
         <View style={styles.footer}>
-          <Pressable
+          <AnimatedPressable
             style={[
               styles.verifyBtn,
               { backgroundColor: theme.primary },
@@ -184,7 +192,7 @@ export default function RegisterOtpScreen() {
             ) : (
               <Text style={styles.verifyText}>Verify &amp; Create Account</Text>
             )}
-          </Pressable>
+          </AnimatedPressable>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

@@ -13,11 +13,9 @@ export interface VendorAccount {
   // Fields from the real Create Vendor form (admin/vendors.tsx). Kept
   // optional and alongside businessName/ownerName/category above rather
   // than replacing them, so nothing else in the app needed to change —
-  // businessName is populated from shopName, ownerName from
-  // firstName+lastName, and category from businessType when a vendor is
-  // created through the real flow.
-  firstName?: string;
-  lastName?: string;
+  // businessName is populated from shopName, ownerName from vendorName,
+  // and category from businessType when a vendor is created through the
+  // real flow.
   vendorName?: string;
   mobileNumber?: string;
   businessType?: string;

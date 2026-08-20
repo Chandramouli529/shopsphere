@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { colors, radius, spacing } from "@/theme/colors";
+import FadeInView from "@/components/FadeInView";
 
 interface Props {
   icon: keyof typeof import("@expo/vector-icons").Ionicons.glyphMap;
@@ -10,11 +11,14 @@ interface Props {
   accentColor: string;
   trend?: string;
   trendUp?: boolean;
+  /** Stagger index — pass the card's position in the grid (0, 1, 2...)
+   * so a row of stat cards cascades in rather than popping in together. */
+  index?: number;
 }
 
-export default function StatCard({ icon, label, value, accentColor, trend, trendUp }: Props) {
+export default function StatCard({ icon, label, value, accentColor, trend, trendUp, index = 0 }: Props) {
   return (
-    <View style={styles.card}>
+    <FadeInView style={styles.card} delay={index * 60}>
       <View style={[styles.iconBox, { backgroundColor: accentColor + "22" }]}>
         <Ionicons name={icon} size={18} color={accentColor} />
       </View>
@@ -26,7 +30,7 @@ export default function StatCard({ icon, label, value, accentColor, trend, trend
           <Text style={[styles.trendText, { color: trendUp ? colors.green : "#c0392b" }]}>{trend}</Text>
         </View>
       )}
-    </View>
+    </FadeInView>
   );
 }
 

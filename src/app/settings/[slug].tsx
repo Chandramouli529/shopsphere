@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -28,6 +28,7 @@ import {
   type SavedCard,
 } from "@/store/slices/settingsSlice";
 import { addItem } from "@/store/slices/cartSlice";
+import { fetchOrders } from "@/store/slices/ordersSlice";
 import { removeWishlistItem, type WishlistItem } from "@/store/slices/wishlistSlice";
 import ProductImage from "@/components/ProductImage";
 import { setThemeKey } from "@/store/slices/themeSlice";
@@ -91,6 +92,10 @@ export default function SettingDetailScreen() {
     (state: RootState) => state.settings
   );
   const orders = useSelector((state: RootState) => state.orders.list);
+
+  useEffect(() => {
+    if (slug === "orders") dispatch(fetchOrders());
+  }, [dispatch, slug]);
   const wishlistItems = useSelector((state: RootState) => state.wishlist.items);
   const themeKey = useSelector((state: RootState) => state.theme.themeKey);
   const activeTheme = useAppTheme();

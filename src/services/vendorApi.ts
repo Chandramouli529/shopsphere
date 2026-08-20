@@ -1,4 +1,4 @@
-import * as SecureStore from "expo-secure-store";
+import { safeGetItem } from "@/services/secureStorage";
 import axios from "axios";
 
 const API_BASE_URL = "https://shopsphere-ecommerce-82jz.onrender.com/api";
@@ -18,7 +18,7 @@ const vendorApiClient = axios.create({
 });
 
 vendorApiClient.interceptors.request.use(async (config) => {
-  const token = await SecureStore.getItemAsync(VENDOR_TOKEN_KEY);
+  const token = await safeGetItem(VENDOR_TOKEN_KEY);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }

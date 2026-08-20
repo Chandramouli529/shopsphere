@@ -18,7 +18,7 @@ import type { AppDispatch, RootState } from "@/store/store";
 import { vendorVerifyOtp } from "@/store/slices/vendorAuthSlice";
 
 const OTP_LENGTH = 6;
-const OTP_VALIDITY_MS = 5 * 60 * 1000; // 5 minutes
+const OTP_VALIDITY_MS = 10 * 60 * 1000; // 10 minutes
 
 function formatCountdown(ms: number): string {
   const totalSeconds = Math.max(0, Math.ceil(ms / 1000));

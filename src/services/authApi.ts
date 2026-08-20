@@ -1,7 +1,8 @@
 import axios from "axios";
 import { secureStorage } from "@/services/secureStorage";
 
-const API_BASE_URL = "https://shopsphere-ecommerce-82jz.onrender.com/api";
+const API_BASE_URL =
+  "https://shopsphere-ecommerce-82jz.onrender.com/api";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -12,86 +13,176 @@ const api = axios.create({
   },
 });
 
-// Add token to requests
-api.interceptors.request.use(async (config) => {
-  const token = await secureStorage.getToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+// ======================================================
+// ADD TOKEN TO REQUESTS
+// ======================================================
+
+api.interceptors.request.use(
+  async (config) => {
+    try {
+      const token =
+        await secureStorage.getToken();
+
+      if (token) {
+        config.headers.Authorization =
+          `Bearer ${token}`;
+      }
+    } catch (error) {
+      console.error(
+        "Error getting token:",
+        error
+      );
+
+      // Do not block public requests such as
+      // registration/login when SecureStore fails.
+    }
+
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
-  return config;
-});
+);
+
+// ======================================================
+// AUTH API
+// ======================================================
 
 export const authApi = {
-  // Register User
+
+  // ====================================================
+  // REGISTER USER
+  // ====================================================
+
   register: async (data: {
     firstName: string;
     lastName: string;
     email: string;
     mobileNumber: string;
     password: string;
+    confirmPassword: string;
   }) => {
-    const response = await api.post("/auth/register", {
-      name: `${data.firstName} ${data.lastName}`,
+
+    const requestBody = {
+      firstName: data.firstName,
+      lastName: data.lastName,
       email: data.email,
-      password: data.password,
       mobileNumber: data.mobileNumber,
-      // Every account created through the customer app's Register screen is
-      // a customer — this isn't user-selectable, so it's set automatically
-      // here rather than exposed as a form field.
-      role: "customer",
-    });
-    return response.data;
-  },
-
-  // Verify Email OTP
-  verifyEmail: async (email: string, otp: string) => {
-    const response = await api.post("/auth/verify-email", {
-      email,
-      emailOtp: otp,
-    });
-    return response.data;
-  },
-
-  // Login User
-  login: async (data: {
-    email: string;
-    password: string;
-    rememberMe?: boolean;
-  }) => {
-    const response = await api.post("/auth/login", {
-      email: data.email,
       password: data.password,
-    });
+      confirmPassword: data.confirmPassword,
+    };
+
+    console.log(
+      "REGISTER REQUEST BODY:",
+      {
+        ...requestBody,
+
+        // Don't print actual passwords
+        password: "[HIDDEN]",
+        confirmPassword: "[HIDDEN]",
+      }
+    );
+
+    const response = await api.post(
+      "/auth/register",
+      requestBody
+    );
+
     return response.data;
   },
 
-  // Request OTP (for resend)
+  // ====================================================
+  // VERIFY EMAIL OTP
+  // ====================================================
+
+  verifyEmail: async (
+    email: string,
+    otp: string
+  ) => {
+    const response = await api.post(
+      "/auth/verify-email",
+      {
+        email,
+        emailOtp: otp,
+      }
+    );
+
+    return response.data;
+  },
+
+  // ====================================================
+  // LOGIN
+  // ====================================================
+
+  login: async (data: {
+  email: string;
+  password: string;
+  rememberMe?: boolean;
+}) => {
+  const response = await api.post("/auth/login", {
+    email: data.email.trim(),
+    password: data.password,
+  });
+
+  return response.data;
+},
+
+  // ====================================================
+  // REQUEST OTP
+  // ====================================================
+
   requestOtp: async (email: string) => {
-    const response = await api.post("/auth/verify-email", { email });
-    // or if you have a dedicated endpoint like /auth/request-otp, use that:
-    // const response = await api.post('/auth/request-otp', { email });
+    const response = await api.post(
+      "/auth/verify-email",
+      {
+        email,
+      }
+    );
+
     return response.data;
   },
 
-  // Get Profile
+  // ====================================================
+  // GET PROFILE
+  // ====================================================
+
   getProfile: async () => {
-    const response = await api.get("/auth/profile");
+    const response =
+      await api.get("/auth/profile");
+
     return response.data;
   },
 
-  // Reset password after forgot-password OTP verification.
-  // NOTE: endpoint path/shape is a guess following the same /auth/* pattern
-  // as the rest of this file — confirm against your actual backend route
-  // and adjust if it differs (e.g. field names, or a separate verify step).
-  resetPassword: async (data: { email: string; otp: string; newPassword: string }) => {
-    const response = await api.post("/auth/reset-password", data);
+  // ====================================================
+  // RESET PASSWORD
+  // ====================================================
+
+  resetPassword: async (data: {
+    email: string;
+    otp: string;
+    newPassword: string;
+  }) => {
+    const response = await api.post(
+      "/auth/reset-password",
+      data
+    );
+
     return response.data;
   },
 
-  // Change password for an already-logged-in user.
-  // NOTE: same caveat as resetPassword — confirm this matches your backend.
-  changePassword: async (data: { currentPassword: string; newPassword: string }) => {
-    const response = await api.post("/auth/change-password", data);
+  // ====================================================
+  // CHANGE PASSWORD
+  // ====================================================
+
+  changePassword: async (data: {
+    currentPassword: string;
+    newPassword: string;
+  }) => {
+    const response = await api.post(
+      "/auth/change-password",
+      data
+    );
+
     return response.data;
   },
 };

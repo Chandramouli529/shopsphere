@@ -12,7 +12,8 @@ import { findProductById } from "@/data/products";
 import { FLASH_SALE_ITEMS } from "@/data/flashSale";
 import { parsePrice } from "@/utils/price";
 import { deriveRating, deriveConditionRatings, ratingLabel } from "@/utils/rating";
-import { deriveHighlights, deriveSpecifications, deriveWarrantyText, deriveManufacturerInfo } from "@/utils/productDetails";
+import { deriveHighlights, deriveSpecifications, deriveWarrantyText, deriveManufacturerInfo, type SpecGroup } from "@/utils/productDetails";
+import { attributeLabel, CUSTOMER_HIDDEN_ATTRIBUTE_KEYS } from "@/utils/filters";
 import { addItem, setPendingItem } from "@/store/slices/cartSlice";
 import ProductGallery from "@/components/ProductGallery";
 import RatingBreakdown from "@/components/RatingBreakdown";
@@ -53,7 +54,31 @@ export default function ProductDetailsScreen() {
   const dispatch = useDispatch<AppDispatch>();
   const theme = useAppTheme();
 
-  const found = useMemo(() => findProductById(id ?? ""), [id]);
+  const vendorProducts = useSelector((state: RootState) => state.vendorProducts.products);
+  const found = useMemo(() => {
+    const staticMatch = findProductById(id ?? "");
+    if (staticMatch) return staticMatch;
+    // Not in the (currently empty) static catalog — check real,
+    // approved, available vendor products, since a customer can land
+    // here from Home/Categories/Search showing a real vendor product.
+    const vendorMatch = vendorProducts.find(
+      (p) => p.id === id && p.approvalStatus === "approved" && p.available
+    );
+    if (!vendorMatch) return undefined;
+    return {
+      product: {
+        id: vendorMatch.id,
+        title: vendorMatch.title,
+        price: `₹${vendorMatch.price.toLocaleString("en-IN")}`,
+        emoji: "📦",
+        image: vendorMatch.images[0] ?? "",
+        images: vendorMatch.images,
+        attributes: vendorMatch.attributes,
+        description: vendorMatch.description || undefined,
+      },
+      categoryKey: vendorMatch.category,
+    };
+  }, [id, vendorProducts]);
   const flashSaleInfo = useMemo(() => FLASH_SALE_ITEMS.find((f) => f.id === id), [id]);
   const conditionRatings = useMemo(
     () => deriveConditionRatings(id ?? "", found?.categoryKey ?? ""),
@@ -86,9 +111,21 @@ export default function ProductDetailsScreen() {
   const categoryLabel = CATEGORIES.find((c) => c.key === categoryKey)?.label ?? "";
   const { rating, reviewCount } = deriveRating(product.id);
   const priceNum = parsePrice(product.price);
-  const description = `${product.title} is one of our best-rated picks in ${categoryLabel}. Crafted for everyday reliability with quality materials, it's backed by ShopSphere's easy 7-day return policy and fast delivery.`;
+  const description =
+    product.description ||
+    `${product.title} is one of our best-rated picks in ${categoryLabel}. Crafted for everyday reliability with quality materials, it's backed by ShopSphere's easy 7-day return policy and fast delivery.`;
   const highlights = deriveHighlights(categoryKey, product.id);
-  const specGroups = deriveSpecifications(categoryKey, product.id);
+  const genericSpecGroups = deriveSpecifications(categoryKey, product.id);
+  // Real vendor products carry real attribute data (brand, material,
+  // color, etc. — see data/vendorProductAttributes.ts) — show that as
+  // genuine specifications instead of the empty generic placeholder.
+  const attributeSpecRows = Object.entries(product.attributes ?? {})
+    .filter(([key, value]) => value && !CUSTOMER_HIDDEN_ATTRIBUTE_KEYS.has(key))
+    .map(([key, value]) => ({ label: attributeLabel(key), value }));
+  const specGroups: SpecGroup[] =
+    attributeSpecRows.length > 0
+      ? [{ title: "Product Details", rows: attributeSpecRows }, ...genericSpecGroups]
+      : genericSpecGroups;
   const warrantyText = deriveWarrantyText(categoryKey);
   const manufacturerInfo = deriveManufacturerInfo();
 

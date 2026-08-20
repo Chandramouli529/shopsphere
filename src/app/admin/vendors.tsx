@@ -14,6 +14,7 @@ import {
 } from "@/store/slices/vendorsSlice";
 import type { VendorAccount } from "@/data/vendors";
 import { CATEGORIES } from "@/data/categories";
+import AnimatedPressable from "@/components/AnimatedPressable";
 import { TOP_BRANDS } from "@/data/topBrands";
 
 const ADMIN_COLOR = "#6c2eb5";
@@ -123,27 +124,27 @@ function VendorCard({ vendor }: { vendor: VendorAccount }) {
           <>
             {vendor.status === "pending" && (
               <>
-                <Pressable style={[styles.actionBtn, { backgroundColor: ADMIN_COLOR }]} onPress={onApprove}>
+                <AnimatedPressable style={[styles.actionBtn, { backgroundColor: ADMIN_COLOR }]} onPress={onApprove}>
                   <Ionicons name="checkmark" size={14} color="#fff" />
                   <Text style={styles.actionBtnText}>Approve</Text>
-                </Pressable>
-                <Pressable style={[styles.actionBtn, styles.rejectBtn]} onPress={onReject}>
+                </AnimatedPressable>
+                <AnimatedPressable style={[styles.actionBtn, styles.rejectBtn]} onPress={onReject}>
                   <Ionicons name="close" size={14} color="#c0392b" />
                   <Text style={[styles.actionBtnText, { color: "#c0392b" }]}>Reject</Text>
-                </Pressable>
+                </AnimatedPressable>
               </>
             )}
             {vendor.status === "approved" && (
-              <Pressable style={[styles.actionBtn, styles.suspendBtn]} onPress={onSuspend}>
+              <AnimatedPressable style={[styles.actionBtn, styles.suspendBtn]} onPress={onSuspend}>
                 <Ionicons name="pause-circle-outline" size={14} color="#7c7c7c" />
                 <Text style={[styles.actionBtnText, { color: "#7c7c7c" }]}>Suspend</Text>
-              </Pressable>
+              </AnimatedPressable>
             )}
             {vendor.status === "suspended" && (
-              <Pressable style={[styles.actionBtn, { backgroundColor: ADMIN_COLOR }]} onPress={onReactivate}>
+              <AnimatedPressable style={[styles.actionBtn, { backgroundColor: ADMIN_COLOR }]} onPress={onReactivate}>
                 <Ionicons name="play-circle-outline" size={14} color="#fff" />
                 <Text style={styles.actionBtnText}>Reactivate</Text>
-              </Pressable>
+              </AnimatedPressable>
             )}
             {vendor.status === "rejected" && <Text style={styles.doneText}>Application rejected</Text>}
           </>
@@ -158,8 +159,6 @@ function CreateVendorModal({ visible, onClose }: { visible: boolean; onClose: ()
   const createStatus = useSelector((state: RootState) => state.vendors.createStatus);
   const createError = useSelector((state: RootState) => state.vendors.createError);
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
   const [vendorName, setVendorName] = useState("");
   const [email, setEmail] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
@@ -170,8 +169,6 @@ function CreateVendorModal({ visible, onClose }: { visible: boolean; onClose: ()
   const loading = createStatus === "loading";
 
   const reset = () => {
-    setFirstName("");
-    setLastName("");
     setVendorName("");
     setEmail("");
     setMobileNumber("");
@@ -182,15 +179,13 @@ function CreateVendorModal({ visible, onClose }: { visible: boolean; onClose: ()
   };
 
   const onSave = async () => {
-    if (!firstName.trim() || !lastName.trim() || !vendorName.trim() || !email.trim() || !mobileNumber.trim() || !businessType.trim() || !shopName.trim()) {
+    if (!vendorName.trim() || !email.trim() || !mobileNumber.trim() || !businessType.trim() || !shopName.trim()) {
       setValidationError("All fields are required.");
       return;
     }
     setValidationError(null);
     const result = await dispatch(
       createVendorRemote({
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
         vendorName: vendorName.trim(),
         email: email.trim(),
         mobileNumber: mobileNumber.trim(),
@@ -218,17 +213,6 @@ function CreateVendorModal({ visible, onClose }: { visible: boolean; onClose: ()
 
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
           <ScrollView contentContainerStyle={{ padding: spacing.lg }} keyboardShouldPersistTaps="handled">
-            <View style={{ flexDirection: "row", gap: spacing.sm }}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.fieldLabel}>First Name</Text>
-                <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.fieldLabel}>Last Name</Text>
-                <TextInput style={styles.input} value={lastName} onChangeText={setLastName} />
-              </View>
-            </View>
-
             <Text style={styles.fieldLabel}>Vendor Name</Text>
             <TextInput style={styles.input} value={vendorName} onChangeText={setVendorName} placeholder="Legal / registered name" />
 

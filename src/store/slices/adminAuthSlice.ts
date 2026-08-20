@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import * as SecureStore from "expo-secure-store";
+import { safeSetItem, safeGetItem, safeDeleteItem } from "@/services/secureStorage";
 import { adminApi, type AdminData } from "@/services/adminApi";
 
 const ADMIN_TOKEN_KEY = "shopsphere_admin_access_token";
@@ -27,7 +27,7 @@ export const adminLogin = createAsyncThunk(
     try {
       const response = await adminApi.login(data);
       if (response.token) {
-        await SecureStore.setItemAsync(ADMIN_TOKEN_KEY, response.token);
+        await safeSetItem(ADMIN_TOKEN_KEY, response.token);
       }
       return response;
     } catch (error: any) {
@@ -42,7 +42,7 @@ export const adminRestoreSession = createAsyncThunk(
   "adminAuth/restoreSession",
   async (_, { rejectWithValue }) => {
     try {
-      const token = await SecureStore.getItemAsync(ADMIN_TOKEN_KEY);
+      const token = await safeGetItem(ADMIN_TOKEN_KEY);
       if (!token) {
         return rejectWithValue("No stored admin session");
       }
@@ -57,7 +57,7 @@ export const adminRestoreSession = createAsyncThunk(
 );
 
 export const adminLogout = createAsyncThunk("adminAuth/logout", async () => {
-  await SecureStore.deleteItemAsync(ADMIN_TOKEN_KEY);
+  await safeDeleteItem(ADMIN_TOKEN_KEY);
 });
 
 const adminAuthSlice = createSlice({

@@ -14,10 +14,10 @@ export interface CategoryDef {
 export const CATEGORIES: CategoryDef[] = [
   { key: "foryou", label: "For You", icon: "gift", avatarBg: "#f3e8ff" },
   { key: "fashion", label: "Fashion", icon: "shirt", avatarBg: "#e0f2e9" },
-  { key: "mobiles", label: "Mobiles", icon: "phone-portrait", avatarBg: "#f0f0f0" },
   { key: "electronics", label: "Electronics", icon: "laptop", avatarBg: "#f5f0ea" },
   { key: "beauty", label: "Beauty", icon: "sparkles", avatarBg: "#ffe6ef" },
   { key: "home", label: "Home", icon: "home", avatarBg: "#fff2e0" },
+  { key: "furniture", label: "Furniture", icon: "bed", avatarBg: "#f0e6da" },
   { key: "appliances", label: "Appliances", icon: "hardware-chip", avatarBg: "#e6f7f5" },
   { key: "toys", label: "Toys", icon: "happy", avatarBg: "#ffe9d6" },
   { key: "sports", label: "Sports", icon: "football", avatarBg: "#fff4cc" },
@@ -25,6 +25,7 @@ export const CATEGORIES: CategoryDef[] = [
   { key: "musicalinstruments", label: "Musical Instruments", icon: "musical-notes", avatarBg: "#f1e9ff" },
   { key: "healthcare", label: "Health Care", icon: "medkit", avatarBg: "#e3f6e6" },
   { key: "groceries", label: "Groceries", icon: "basket", avatarBg: "#eaf7e0" },
+  { key: "books", label: "Books", icon: "book", avatarBg: "#eee6da" },
   { key: "artscrafts", label: "Arts & Crafts", icon: "color-palette", avatarBg: "#fdeed6" },
 ];
 

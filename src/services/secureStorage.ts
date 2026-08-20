@@ -8,6 +8,35 @@ const USER_DATA_KEY = 'shopsphere_user_data';
 const REMEMBER_ME_KEY = 'shopsphere_remember_me';
 const DEVICE_ID_KEY = 'shopsphere_device_id';
 
+// SecureStore requires a real native module to be linked — in some
+// environments (Expo Go/SDK version mismatches, certain web previews)
+// that module is missing, and every SecureStore call throws
+// "getValueWithKeyAsync is not a function" instead of actually failing
+// per-key. Rather than losing the token entirely in that case, these
+// wrappers fall back to plain AsyncStorage — less secure, but the app
+// (and, importantly, "stay logged in") keeps working everywhere.
+export async function safeSetItem(key: string, value: string): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(key, value);
+  } catch {
+    await AsyncStorage.setItem(`securestore_fallback_${key}`, value);
+  }
+}
+export async function safeGetItem(key: string): Promise<string | null> {
+  try {
+    return await SecureStore.getItemAsync(key);
+  } catch {
+    return AsyncStorage.getItem(`securestore_fallback_${key}`);
+  }
+}
+export async function safeDeleteItem(key: string): Promise<void> {
+  try {
+    await SecureStore.deleteItemAsync(key);
+  } catch {
+    await AsyncStorage.removeItem(`securestore_fallback_${key}`);
+  }
+}
+
 // Token Data Interface
 export interface TokenData {
   token: string;
@@ -33,7 +62,7 @@ export const secureStorage = {
    */
   saveToken: async (token: string): Promise<void> => {
     try {
-      await SecureStore.setItemAsync(TOKEN_KEY, token);
+      await safeSetItem(TOKEN_KEY, token);
       console.log('✅ Token saved successfully');
     } catch (error) {
       console.error('❌ Error saving token:', error);
@@ -46,7 +75,7 @@ export const secureStorage = {
    */
   getToken: async (): Promise<string | null> => {
     try {
-      const token = await SecureStore.getItemAsync(TOKEN_KEY);
+      const token = await safeGetItem(TOKEN_KEY);
       return token;
     } catch (error) {
       console.error('❌ Error getting token:', error);
@@ -59,7 +88,7 @@ export const secureStorage = {
    */
   removeToken: async (): Promise<void> => {
     try {
-      await SecureStore.deleteItemAsync(TOKEN_KEY);
+      await safeDeleteItem(TOKEN_KEY);
       console.log('✅ Token removed successfully');
     } catch (error) {
       console.error('❌ Error removing token:', error);
@@ -73,7 +102,7 @@ export const secureStorage = {
    */
   saveRefreshToken: async (refreshToken: string): Promise<void> => {
     try {
-      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
+      await safeSetItem(REFRESH_TOKEN_KEY, refreshToken);
       console.log('✅ Refresh token saved successfully');
     } catch (error) {
       console.error('❌ Error saving refresh token:', error);
@@ -86,7 +115,7 @@ export const secureStorage = {
    */
   getRefreshToken: async (): Promise<string | null> => {
     try {
-      const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+      const refreshToken = await safeGetItem(REFRESH_TOKEN_KEY);
       return refreshToken;
     } catch (error) {
       console.error('❌ Error getting refresh token:', error);
@@ -99,7 +128,7 @@ export const secureStorage = {
    */
   removeRefreshToken: async (): Promise<void> => {
     try {
-      await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+      await safeDeleteItem(REFRESH_TOKEN_KEY);
       console.log('✅ Refresh token removed successfully');
     } catch (error) {
       console.error('❌ Error removing refresh token:', error);
@@ -194,7 +223,7 @@ export const secureStorage = {
    */
   saveDeviceId: async (deviceId: string): Promise<void> => {
     try {
-      await SecureStore.setItemAsync(DEVICE_ID_KEY, deviceId);
+      await safeSetItem(DEVICE_ID_KEY, deviceId);
       console.log('✅ Device ID saved successfully');
     } catch (error) {
       console.error('❌ Error saving device ID:', error);
@@ -207,7 +236,7 @@ export const secureStorage = {
    */
   getDeviceId: async (): Promise<string | null> => {
     try {
-      const deviceId = await SecureStore.getItemAsync(DEVICE_ID_KEY);
+      const deviceId = await safeGetItem(DEVICE_ID_KEY);
       return deviceId;
     } catch (error) {
       console.error('❌ Error getting device ID:', error);
@@ -348,9 +377,9 @@ export const secureStorage = {
       const keys = await secureStorage.getAllKeys();
       await Promise.all(keys.map(key => AsyncStorage.removeItem(key)));
       await Promise.all([
-        SecureStore.deleteItemAsync(TOKEN_KEY),
-        SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
-        SecureStore.deleteItemAsync(DEVICE_ID_KEY),
+        safeDeleteItem(TOKEN_KEY),
+        safeDeleteItem(REFRESH_TOKEN_KEY),
+        safeDeleteItem(DEVICE_ID_KEY),
       ]);
       console.log('✅ All ShopSphere storage cleared');
     } catch (error) {

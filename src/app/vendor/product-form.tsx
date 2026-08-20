@@ -3,6 +3,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
   KeyboardAvoidingView,
@@ -18,17 +19,14 @@ import { useDispatch, useSelector } from "react-redux";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, radius, spacing, typography } from "@/theme/colors";
 import type { AppDispatch, RootState } from "@/store/store";
-import { addProduct, updateProduct, type ProductVariant } from "@/store/slices/vendorProductsSlice";
+import { createProductRemote, updateProductRemote } from "@/store/slices/vendorProductsSlice";
 import { CATEGORIES } from "@/data/categories";
+import { SUBCATEGORIES_BY_CATEGORY } from "@/data/subcategories";
 import { getCategoryAttributes, type AttributeField } from "@/data/vendorProductAttributes";
 
 const VENDOR_COLOR = "#2c3e50";
 const MAX_IMAGES = 5;
-// Real category keys (matching the customer app's Categories screen
-// exactly), not a separate hardcoded label list — this is what makes a
-// vendor-created product actually show up under the right customer
-// category rather than silently never matching.
-const CATEGORY_OPTIONS = CATEGORIES.filter((c) => c.key !== "foryou");
+const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
 
 export default function VendorProductFormScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -40,18 +38,39 @@ export default function VendorProductFormScreen() {
   );
   const isEdit = !!existing;
 
+  // Category is locked to the vendor's own business type — a vendor only
+  // ever creates products in the category they registered under, so
+  // there's no category picker here at all.
+  const vendorCategoryDef = CATEGORIES.find(
+    (c) => c.label === vendor?.category || c.key === vendor?.category
+  );
+  const category = existing?.category ?? vendorCategoryDef?.key ?? "";
+  const categoryLabel = vendorCategoryDef?.label ?? vendor?.category ?? "Uncategorized";
+
   const [title, setTitle] = useState(existing?.title ?? "");
   const [description, setDescription] = useState(existing?.description ?? "");
   const [price, setPrice] = useState(existing ? String(existing.price) : "");
-  const [category, setCategory] = useState(existing?.category ?? CATEGORY_OPTIONS[0].key);
   const [stock, setStock] = useState(existing ? String(existing.stock) : "0");
   const [images, setImages] = useState<string[]>(existing?.images ?? []);
-  const [variants, setVariants] = useState<ProductVariant[]>(existing?.variants ?? []);
   const [attributes, setAttributes] = useState<Record<string, string>>(existing?.attributes ?? {});
   const [error, setError] = useState<string | null>(null);
 
+  const createStatus = useSelector((state: RootState) => state.vendorProducts.createStatus);
+  const updateBusy = useSelector((state: RootState) =>
+    existing ? state.vendorProducts.actionStatus[existing.id] === "loading" : false
+  );
+  const saving = createStatus === "loading" || updateBusy;
+
   const categoryAttributes = getCategoryAttributes(category);
   const setAttribute = (key: string, value: string) => setAttributes((a) => ({ ...a, [key]: value }));
+
+  const selectedSizes = (attributes.sizes ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const toggleSize = (size: string) => {
+    const next = selectedSizes.includes(size)
+      ? selectedSizes.filter((s) => s !== size)
+      : [...selectedSizes, size];
+    setAttribute("sizes", next.join(", "));
+  };
 
   const onPickImage = async () => {
     if (images.length >= MAX_IMAGES) {
@@ -71,16 +90,12 @@ export default function VendorProductFormScreen() {
 
   const onRemoveImage = (uri: string) => setImages((imgs) => imgs.filter((i) => i !== uri));
 
-  const onAddVariant = () => {
-    setVariants((v) => [...v, { id: "var_" + Date.now(), name: "", value: "" }]);
-  };
-  const onUpdateVariant = (vid: string, field: "name" | "value", value: string) => {
-    setVariants((v) => v.map((variant) => (variant.id === vid ? { ...variant, [field]: value } : variant)));
-  };
-  const onRemoveVariant = (vid: string) => setVariants((v) => v.filter((variant) => variant.id !== vid));
-
-  const onSave = () => {
+  const onSave = async () => {
     if (!vendor) return;
+    if (!category) {
+      setError("Your vendor account has no business type set — contact admin.");
+      return;
+    }
     const priceNum = parseFloat(price);
     const stockNum = parseInt(stock, 10);
     if (!title.trim()) return setError("Product title is required.");
@@ -89,8 +104,8 @@ export default function VendorProductFormScreen() {
     setError(null);
 
     if (isEdit && existing) {
-      dispatch(
-        updateProduct({
+      const result = await dispatch(
+        updateProductRemote({
           ...existing,
           title: title.trim(),
           description: description.trim(),
@@ -98,13 +113,17 @@ export default function VendorProductFormScreen() {
           category,
           stock: stockNum,
           images,
-          variants: variants.filter((v) => v.name.trim() && v.value.trim()),
           attributes,
         })
       );
+      if (updateProductRemote.fulfilled.match(result)) {
+        router.back();
+      } else {
+        setError((result.payload as string) ?? "Could not save changes. Please try again.");
+      }
     } else {
-      dispatch(
-        addProduct({
+      const result = await dispatch(
+        createProductRemote({
           vendorId: vendor.id,
           title: title.trim(),
           description: description.trim(),
@@ -113,13 +132,17 @@ export default function VendorProductFormScreen() {
           stock: stockNum,
           lowStockThreshold: 10,
           images,
-          variants: variants.filter((v) => v.name.trim() && v.value.trim()),
+          variants: [],
           available: true,
           attributes,
         })
       );
+      if (createProductRemote.fulfilled.match(result)) {
+        router.back();
+      } else {
+        setError((result.payload as string) ?? "Could not create product. Please try again.");
+      }
     }
-    router.back();
   };
 
   return (
@@ -134,6 +157,11 @@ export default function VendorProductFormScreen() {
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl * 2 }} keyboardShouldPersistTaps="handled">
+          <View style={styles.categoryBadge}>
+            <Ionicons name="pricetag" size={13} color={VENDOR_COLOR} />
+            <Text style={styles.categoryBadgeText}>{categoryLabel}</Text>
+          </View>
+
           <Text style={styles.sectionLabel}>Product Images</Text>
           <View style={styles.imagesRow}>
             {images.map((uri) => (
@@ -157,73 +185,87 @@ export default function VendorProductFormScreen() {
 
           <View style={{ flexDirection: "row", gap: spacing.sm }}>
             <View style={{ flex: 1 }}>
-              <Field label="Price (₹)" value={price} onChangeText={setPrice} keyboardType="decimal-pad" />
+              <Field label="Selling Price (₹)" value={price} onChangeText={setPrice} keyboardType="decimal-pad" />
             </View>
             <View style={{ flex: 1 }}>
               <Field label="Stock Quantity" value={stock} onChangeText={setStock} keyboardType="number-pad" />
             </View>
           </View>
 
-          <Text style={styles.fieldLabel}>Category</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.md }}>
-            {CATEGORY_OPTIONS.map((c) => (
-              <Pressable
-                key={c.key}
-                style={[styles.categoryChip, category === c.key && { backgroundColor: VENDOR_COLOR }]}
-                onPress={() => setCategory(c.key)}
-              >
-                <Text style={[styles.categoryChipText, category === c.key && { color: "#fff" }]}>{c.label}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-
           {categoryAttributes.length > 0 && (
             <>
-              <Text style={styles.sectionLabel}>{CATEGORY_OPTIONS.find((c) => c.key === category)?.label} Details</Text>
-              {categoryAttributes.map((field) => (
-                <AttributeInput
-                  key={field.key}
-                  field={field}
-                  value={attributes[field.key] ?? ""}
-                  onChange={(v) => setAttribute(field.key, v)}
-                />
-              ))}
+              <Text style={styles.sectionLabel}>{categoryLabel} Details</Text>
+              {categoryAttributes.map((field) => {
+                if (field.key === "subCategory" && (SUBCATEGORIES_BY_CATEGORY[category]?.length ?? 0) > 0) {
+                  return (
+                    <View key={field.key} style={{ marginBottom: spacing.md }}>
+                      <Text style={styles.inputLbl}>{field.label}</Text>
+                      <View style={styles.selectRow}>
+                        {SUBCATEGORIES_BY_CATEGORY[category].map((sub) => {
+                          const isActive = attributes.subCategory === sub.label;
+                          return (
+                            <Pressable
+                              key={sub.label}
+                              style={[styles.selectChip, isActive && { backgroundColor: VENDOR_COLOR }]}
+                              onPress={() => setAttribute("subCategory", sub.label)}
+                            >
+                              <Text style={[styles.selectChipText, isActive && { color: "#fff" }]}>
+                                {sub.emoji} {sub.label}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  );
+                }
+                if (field.key === "sizes") {
+                  return (
+                    <View key={field.key} style={{ marginBottom: spacing.md }}>
+                      <Text style={styles.inputLbl}>{field.label}</Text>
+                      <View style={styles.selectRow}>
+                        {SIZE_OPTIONS.map((size) => {
+                          const isActive = selectedSizes.includes(size);
+                          return (
+                            <Pressable
+                              key={size}
+                              style={[styles.selectChip, isActive && { backgroundColor: VENDOR_COLOR }]}
+                              onPress={() => toggleSize(size)}
+                            >
+                              <Text style={[styles.selectChipText, isActive && { color: "#fff" }]}>{size}</Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  );
+                }
+                return (
+                  <AttributeInput
+                    key={field.key}
+                    field={field}
+                    value={attributes[field.key] ?? ""}
+                    onChange={(v) => setAttribute(field.key, v)}
+                  />
+                );
+              })}
             </>
           )}
-
-          <View style={styles.variantsHeader}>
-            <Text style={styles.sectionLabel}>Variants</Text>
-            <Pressable onPress={onAddVariant} hitSlop={8}>
-              <Text style={styles.addVariantText}>+ Add Variant</Text>
-            </Pressable>
-          </View>
-          {variants.length === 0 && <Text style={styles.emptyVariants}>No variants — e.g. add "Size: M" or "Color: Red"</Text>}
-          {variants.map((v) => (
-            <View key={v.id} style={styles.variantRow}>
-              <TextInput
-                style={styles.variantInput}
-                placeholder="Name (e.g. Size)"
-                value={v.name}
-                onChangeText={(text) => onUpdateVariant(v.id, "name", text)}
-              />
-              <TextInput
-                style={styles.variantInput}
-                placeholder="Value (e.g. M)"
-                value={v.value}
-                onChangeText={(text) => onUpdateVariant(v.id, "value", text)}
-              />
-              <Pressable onPress={() => onRemoveVariant(v.id)} hitSlop={8}>
-                <Ionicons name="trash-outline" size={17} color="#c0392b" />
-              </Pressable>
-            </View>
-          ))}
 
           {error && <Text style={styles.errorText}>{error}</Text>}
         </ScrollView>
 
         <View style={styles.footer}>
-          <Pressable style={[styles.saveBtn, { backgroundColor: VENDOR_COLOR }]} onPress={onSave}>
-            <Text style={styles.saveBtnText}>{isEdit ? "Save Changes" : "Create Product"}</Text>
+          <Pressable
+            style={[styles.saveBtn, { backgroundColor: VENDOR_COLOR }, saving && { opacity: 0.6 }]}
+            onPress={onSave}
+            disabled={saving}
+          >
+            {saving ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.saveBtnText}>{isEdit ? "Save Changes" : "Create Product"}</Text>
+            )}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -293,6 +335,18 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.line,
   },
   headerTitle: { ...typography.h3, flex: 1, textAlign: "center" },
+  categoryBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    backgroundColor: "#eef1f5",
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    marginBottom: spacing.lg,
+  },
+  categoryBadgeText: { fontSize: 12.5, fontWeight: "700", color: VENDOR_COLOR },
   sectionLabel: { fontSize: 12.5, fontWeight: "700", color: colors.inkSoft, marginBottom: spacing.sm },
   imagesRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.lg },
   imageThumbWrap: { position: "relative" },
@@ -330,15 +384,6 @@ const styles = StyleSheet.create({
   },
   inputLbl: { fontSize: 10.5, color: VENDOR_COLOR, marginBottom: 2 },
   input: { fontSize: 14, paddingVertical: 2, color: colors.ink },
-  fieldLabel: { fontSize: 12.5, fontWeight: "700", color: colors.inkSoft, marginBottom: spacing.sm },
-  categoryChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 7,
-    borderRadius: radius.full,
-    backgroundColor: colors.bg,
-    marginRight: spacing.sm,
-  },
-  categoryChipText: { fontSize: 12, fontWeight: "600", color: colors.ink },
   selectRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   selectChip: {
     paddingHorizontal: spacing.md,
@@ -349,19 +394,6 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
   },
   selectChipText: { fontSize: 11.5, fontWeight: "600", color: colors.ink },
-  variantsHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: spacing.sm },
-  addVariantText: { fontSize: 12, fontWeight: "700", color: VENDOR_COLOR },
-  emptyVariants: { fontSize: 11.5, color: colors.inkSoft, marginBottom: spacing.md, fontStyle: "italic" },
-  variantRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.sm },
-  variantInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-    fontSize: 13,
-  },
   errorText: { color: "#d32f2f", fontSize: 12, marginTop: spacing.sm },
   footer: { padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.line },
   saveBtn: { paddingVertical: 14, borderRadius: radius.sm, alignItems: "center" },

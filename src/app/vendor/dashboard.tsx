@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -11,13 +11,6 @@ import StatCard from "@/components/StatCard";
 import BarChart from "@/components/BarChart";
 
 const VENDOR_COLOR = "#2c3e50";
-
-const STATUS_BAR_META: Record<string, { label: string; color: string; bg: string; icon: keyof typeof import("@expo/vector-icons").Ionicons.glyphMap }> = {
-  approved: { label: "Account Approved", color: "#1b7a3d", bg: "#e3f6e6", icon: "checkmark-circle" },
-  pending: { label: "Account Pending Approval", color: "#b8860b", bg: "#fff3cd", icon: "time" },
-  suspended: { label: "Account Suspended", color: "#7c7c7c", bg: "#f0f0f0", icon: "pause-circle" },
-  rejected: { label: "Account Rejected", color: "#c0392b", bg: "#fdecea", icon: "close-circle" },
-};
 
 /** TODO: replace with a real API call (e.g. GET /vendor/:id/stats) once
  * that endpoint exists. No mock data generation happens here anymore —
@@ -44,17 +37,8 @@ export default function VendorDashboardScreen() {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
   const vendor = useSelector((state: RootState) => state.vendorAuth.vendor);
-  const [showStatusNotice, setShowStatusNotice] = useState(true);
 
   const stats = vendor ? EMPTY_VENDOR_STATS : null;
-
-  // Status notice is a brief notification on arriving at the dashboard,
-  // not a permanent fixture — auto-dismisses after a few seconds.
-  useEffect(() => {
-    setShowStatusNotice(true);
-    const timer = setTimeout(() => setShowStatusNotice(false), 4000);
-    return () => clearTimeout(timer);
-  }, [vendor?.status]);
 
   const onLogout = () => {
     Alert.alert("Log Out", "Are you sure you want to log out of the vendor portal?", [
@@ -72,8 +56,6 @@ export default function VendorDashboardScreen() {
 
   if (!vendor || !stats) return null;
 
-  const statusMeta = STATUS_BAR_META[vendor.status.toLowerCase()] ?? STATUS_BAR_META.pending;
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={["top"]}>
       <View style={styles.header}>
@@ -87,23 +69,13 @@ export default function VendorDashboardScreen() {
         </Pressable>
       </View>
 
-      {showStatusNotice && (
-        <View style={[styles.statusBar, { backgroundColor: statusMeta.bg }]}>
-          <Ionicons name={statusMeta.icon} size={13} color={statusMeta.color} />
-          <Text style={[styles.statusBarText, { color: statusMeta.color }]}>{statusMeta.label}</Text>
-          <Pressable onPress={() => setShowStatusNotice(false)} hitSlop={8} style={styles.statusDismiss}>
-            <Ionicons name="close" size={13} color={statusMeta.color} />
-          </Pressable>
-        </View>
-      )}
-
       <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xl }}>
         <Text style={styles.sectionTitle}>Overview</Text>
         <View style={styles.cardsGrid}>
-          <StatCard icon="cash" label="Revenue" value={formatINR(stats.revenue)} accentColor={VENDOR_COLOR} />
-          <StatCard icon="receipt" label="Orders" value={String(stats.orders)} accentColor="#2874f0" />
-          <StatCard icon="people" label="Customers" value={String(stats.customers)} accentColor="#8e44ad" />
-          <StatCard icon="cube" label="Products" value={String(stats.products)} accentColor="#16a085" />
+          <StatCard icon="cash" label="Revenue" value={formatINR(stats.revenue)} accentColor={VENDOR_COLOR} index={0} />
+          <StatCard icon="receipt" label="Orders" value={String(stats.orders)} accentColor="#2874f0" index={1} />
+          <StatCard icon="people" label="Customers" value={String(stats.customers)} accentColor="#8e44ad" index={2} />
+          <StatCard icon="cube" label="Products" value={String(stats.products)} accentColor="#16a085" index={3} />
           <StatCard
             icon="time"
             label="Pending Orders"
@@ -111,6 +83,7 @@ export default function VendorDashboardScreen() {
             accentColor="#e67e22"
             trend={stats.pendingOrders > 10 ? "Needs attention" : undefined}
             trendUp={false}
+            index={4}
           />
         </View>
 
@@ -131,16 +104,6 @@ export default function VendorDashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  statusBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 6,
-    position: "relative",
-  },
-  statusBarText: { fontSize: 11.5, fontWeight: "700" },
-  statusDismiss: { position: "absolute", right: spacing.md },
   header: {
     flexDirection: "row",
     alignItems: "center",

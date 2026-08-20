@@ -1,12 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useMemo } from "react";
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useMemo } from "react";
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, radius, spacing, typography } from "@/theme/colors";
 import type { AppDispatch, RootState } from "@/store/store";
-import { deleteProduct, type VendorProduct } from "@/store/slices/vendorProductsSlice";
+import { fetchAllVendorProducts, deleteProductRemote, type VendorProduct } from "@/store/slices/vendorProductsSlice";
 import ProductImage from "@/components/ProductImage";
 
 const VENDOR_COLOR = "#2c3e50";
@@ -30,15 +30,29 @@ export default function VendorProductsScreen() {
   const dispatch = useDispatch<AppDispatch>();
   const vendor = useSelector((state: RootState) => state.vendorAuth.vendor);
   const allProducts = useSelector((state: RootState) => state.vendorProducts.products);
+  const fetchStatus = useSelector((state: RootState) => state.vendorProducts.fetchStatus);
   const products = useMemo(
     () => allProducts.filter((p) => p.vendorId === vendor?.id),
     [allProducts, vendor?.id]
   );
 
+  useEffect(() => {
+    if (vendor?.id) dispatch(fetchAllVendorProducts(vendor.id));
+  }, [dispatch, vendor?.id]);
+
   const onDelete = (product: VendorProduct) => {
     Alert.alert("Delete Product", `Remove "${product.title}" permanently?`, [
       { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: () => dispatch(deleteProduct(product.id)) },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          const result = await dispatch(deleteProductRemote({ id: product.id, category: product.category }));
+          if (deleteProductRemote.rejected.match(result)) {
+            Alert.alert("Failed", (result.payload as string) ?? "Could not delete this product.");
+          }
+        },
+      },
     ]);
   };
 
@@ -52,7 +66,12 @@ export default function VendorProductsScreen() {
         </Pressable>
       </View>
 
-      {products.length === 0 ? (
+      {fetchStatus === "loading" && products.length === 0 ? (
+        <View style={styles.emptyWrap}>
+          <ActivityIndicator size="large" color={VENDOR_COLOR} />
+          <Text style={styles.emptyText}>Loading your products…</Text>
+        </View>
+      ) : products.length === 0 ? (
         <View style={styles.emptyWrap}>
           <Ionicons name="cube-outline" size={40} color="#bbb" />
           <Text style={styles.emptyText}>No products yet. Add your first one.</Text>

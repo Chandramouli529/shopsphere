@@ -81,15 +81,15 @@ export default function AccountScreen() {
             <View style={styles.userBand}>
               <Pressable onPress={() => router.push("/edit-profile")}>
                 <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
-                  <Text style={styles.avatarInitial}>{user!.name.charAt(0).toUpperCase()}</Text>
+                  <Text style={styles.avatarInitial}>{(user?.name?.charAt(0) ?? "?").toUpperCase()}</Text>
                 </View>
                 <View style={styles.editBadge}>
                   <Ionicons name="pencil" size={11} color="#fff" />
                 </View>
               </Pressable>
               <View style={{ flex: 1 }}>
-                <Text style={styles.userName}>{user!.name}</Text>
-                <Text style={styles.userEmail}>{user!.email}</Text>
+                <Text style={styles.userName}>{user?.name ?? "Customer"}</Text>
+                <Text style={styles.userEmail}>{user?.email ?? ""}</Text>
                 <Pressable onPress={() => router.push("/edit-profile")}>
                   <Text style={[styles.editProfileLink, { color: theme.primary }]}>Edit Profile</Text>
                 </Pressable>
