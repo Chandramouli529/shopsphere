@@ -22,7 +22,6 @@ const CATEGORY_ENDPOINT: Record<string, string> = {
   groceries: "groceries",
   books: "books",
   artscrafts: "arts-crafts",
-  // furniture: "furniture", --- no endpoint yet
 };
 
 export function getCategoryEndpoint(categoryKey: string): string | null {
@@ -51,8 +50,6 @@ const CATEGORIES_WITH_PUT = new Set([
   "healthcare",
   "groceries",
   "artscrafts",
-  "furniture",
-  "fashion"
 ]);
 
 export function hasReplaceEndpoint(categoryKey: string): boolean {
@@ -553,10 +550,19 @@ export function buildCreatePayload(product: {
       return payload;
     }
     case "toys": {
+      // category here is the toy's own type (Action Figures, Dolls,
+      // etc.) — a real ENUM on the backend's Toys model, entirely
+      // different from the platform category. It comes from `a`
+      // (attributes), which is where the vendor's "Toy Category"
+      // picker stores it — never from product.category (the platform
+      // key "toys", which the backend's Toys.category field would
+      // reject as an invalid enum value).
       const payload: ToysPayload = {
         vendorId: product.vendorId,
         productName: product.title,
-        category: product.category,
+        // Required by the backend's Toys.category ENUM — product-form.tsx
+        // validates this is filled in before ever calling this function.
+        category: a.category ?? "",
         productDescription: product.description,
         sellingPrice: product.price,
         stock: product.stock,

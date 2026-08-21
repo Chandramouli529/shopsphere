@@ -58,21 +58,39 @@ const initialState: VendorProductsState = {
  * back into our generic VendorProduct shape for display. Field names
  * vary per category (see buildCreatePayload), so this checks the most
  * likely spots for each generic field. */
+// Confirmed from the real Toys model (and presumably shared across
+// categories, since they follow the same pattern): status is a real
+// approval-style ENUM — Draft/Pending/Approved/Rejected/Blocked — not
+// something every category lacks, as previously assumed before seeing
+// actual backend code. Only "Approved" products should be treated as
+// approved/customer-visible.
+function mapApprovalStatus(rawStatus: string | undefined): VendorProduct["approvalStatus"] {
+  const s = (rawStatus || "").toLowerCase();
+  if (s === "approved") return "approved";
+  if (s === "rejected" || s === "blocked") return "rejected";
+  return "pending"; // Draft, Pending, or unrecognized/missing
+}
+
 function mapRemoteProduct(raw: any, category: string): VendorProduct {
   const imageField = category === "electronics" ? "images" : category === "books" ? "coverImages" : "imageUrls";
+  const approvalStatus = mapApprovalStatus(raw.status);
   return {
     id: raw._id || raw.id || `unknown_${Date.now()}_${Math.random()}`,
     vendorId: raw.vendorId || "",
-    title: raw.productName || raw.titleDescription || "",
-    description: raw.productDescription || "",
+    title: raw.title || raw.productName || "",
+    description: raw.titleDescription || raw.description || raw.productDescription || "",
     price: Number(raw.sellingPrice ?? raw.price ?? 0),
     category,
     stock: Number(raw.stock ?? 0),
     lowStockThreshold: Number(raw.lowStockLimit ?? 10),
     images: raw[imageField] || [],
     variants: [],
-    available: (raw.status ?? raw.stockStatus) !== "Inactive",
-    approvalStatus: "approved",
+    // Available to customers only when actually approved AND in stock —
+    // stockStatus's real values are "In Stock"/"Low Stock"/"Critical
+    // Stock"/"Out of Stock", not "Inactive" (which never matches any
+    // real value, so the old check was always a no-op).
+    available: approvalStatus === "approved" && raw.stockStatus !== "Out of Stock",
+    approvalStatus,
     createdAt: raw.createdAt ? new Date(raw.createdAt).getTime() : Date.now(),
     attributes: raw,
   };
@@ -130,6 +148,29 @@ export const fetchAllVendorProducts = createAsyncThunk(
           return (Array.isArray(list) ? list : [])
             .map((raw: any) => mapRemoteProduct(raw, categoryKey))
             .filter((p: VendorProduct) => p.vendorId === vendorId);
+        } catch {
+          return [];
+        }
+      })
+    );
+    return results.flat();
+  }
+);
+
+/** Customer-facing — loads every product from every vendor, across all
+ * 13 real category endpoints, with NO vendor filtering. This is what
+ * Home/Categories/Search need to show the full platform catalogue;
+ * fetchAllVendorProducts above is vendor-only (their own products, for
+ * their own dashboard/inventory/reports). */
+export const fetchAllPlatformProducts = createAsyncThunk(
+  "vendorProducts/fetchAllPlatform",
+  async () => {
+    const results = await Promise.all(
+      ALL_REAL_CATEGORY_KEYS.map(async (categoryKey) => {
+        try {
+          const response = await vendorProductApi.list(categoryKey);
+          const list = response.products || response.data || response;
+          return (Array.isArray(list) ? list : []).map((raw: any) => mapRemoteProduct(raw, categoryKey));
         } catch {
           return [];
         }
@@ -222,6 +263,19 @@ const vendorProductsSlice = createSlice({
         state.products = action.payload;
       })
       .addCase(fetchAllVendorProducts.rejected, (state, action) => {
+        state.fetchStatus = "failed";
+        state.fetchError = action.error.message ?? "Could not load products";
+      })
+
+      .addCase(fetchAllPlatformProducts.pending, (state) => {
+        state.fetchStatus = "loading";
+        state.fetchError = null;
+      })
+      .addCase(fetchAllPlatformProducts.fulfilled, (state, action) => {
+        state.fetchStatus = "idle";
+        state.products = action.payload;
+      })
+      .addCase(fetchAllPlatformProducts.rejected, (state, action) => {
         state.fetchStatus = "failed";
         state.fetchError = action.error.message ?? "Could not load products";
       })

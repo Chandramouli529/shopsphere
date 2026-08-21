@@ -16,6 +16,11 @@ export interface AttributeField {
   type: AttributeFieldType;
   placeholder?: string;
   options?: string[]; // only for type "select"
+  /** True when the backend rejects the request without this field
+   * (e.g. a non-nullable column). Validated in product-form.tsx before
+   * submitting — most attribute fields are backend-optional and don't
+   * need this. */
+  required?: boolean;
 }
 
 const MRP_FIELD: AttributeField = { key: "mrp", label: "MRP (₹)", type: "number", placeholder: "Original price before discount" };
@@ -32,6 +37,13 @@ const BRAND_FIELD: AttributeField = { key: "brandName", label: "Brand Name", typ
 const SUBCATEGORY_FIELD: AttributeField = { key: "subCategory", label: "Sub Category", type: "text" };
 const MATERIAL_FIELD: AttributeField = { key: "material", label: "Material", type: "text" };
 const COLOR_FIELD: AttributeField = { key: "color", label: "Color", type: "text" };
+
+/** Clones a shared field with required: true — for cases where a field
+ * like brandName/subCategory/mrp is optional in one category's backend
+ * model but a real non-nullable column in another's (confirmed by
+ * comparing actual Sequelize model files: Toys.brandName is nullable,
+ * Appliances.brandName is not). */
+const required = (field: AttributeField): AttributeField => ({ ...field, required: true });
 
 export const CATEGORY_ATTRIBUTES: Record<string, AttributeField[]> = {
   electronics: [
@@ -72,15 +84,35 @@ export const CATEGORY_ATTRIBUTES: Record<string, AttributeField[]> = {
     { key: "colors", label: "Available Colors", type: "text", placeholder: "e.g. Red, Black, Navy (comma-separated)" },
   ],
   appliances: [
-    BRAND_FIELD,
-    SUBCATEGORY_FIELD,
+    required(BRAND_FIELD),
+    // Appliances.category is a real ENUM of the appliance's own type —
+    // not the platform category (locked to "Appliances" via the
+    // vendor's business type, shown as the read-only badge above).
+    {
+      key: "category",
+      label: "Appliance Category",
+      type: "select",
+      required: true,
+      options: [
+        "Kitchen Appliances",
+        "Home Appliances",
+        "Cleaning Appliances",
+        "Cooling Appliances",
+        "Heating Appliances",
+        "Personal Care Appliances",
+        "Other",
+      ],
+    },
+    required(SUBCATEGORY_FIELD),
     { key: "modelNumber", label: "Model Number", type: "text" },
     COLOR_FIELD,
     { key: "warranty", label: "Warranty", type: "text", placeholder: "e.g. 1 year" },
-    MRP_FIELD,
+    required(MRP_FIELD),
     DISCOUNT_FIELD,
     LOW_STOCK_FIELD,
     CRITICAL_STOCK_FIELD,
+    // No status field — the backend's createAppliances doesn't even
+    // read status from the request; it always defaults to "Pending".
   ],
   artscrafts: [
     BRAND_FIELD,
@@ -184,15 +216,51 @@ export const CATEGORY_ATTRIBUTES: Record<string, AttributeField[]> = {
   ],
   toys: [
     BRAND_FIELD,
+    // This is the real backend's Toys.category field — a Sequelize
+    // ENUM of the toy's own type. Not to be confused with the
+    // platform-level category (locked to "Toys" via the vendor's
+    // business type, shown as the read-only badge above this section).
+    {
+      key: "category",
+      label: "Toy Category",
+      type: "select",
+      required: true,
+      options: [
+        "Action Figures",
+        "Dolls",
+        "Remote Control",
+        "Educational",
+        "Building Blocks",
+        "Board Games",
+        "Puzzles",
+        "Soft Toys",
+        "Outdoor Toys",
+        "Baby Toys",
+        "Vehicles",
+        "Musical Toys",
+        "Pretend Play",
+        "Arts & Crafts",
+        "STEM Toys",
+        "Other",
+      ],
+    },
     SUBCATEGORY_FIELD,
-    { key: "ageGroup", label: "Age Group", type: "text", placeholder: "e.g. 5-8 years" },
+    {
+      key: "ageGroup",
+      label: "Age Group",
+      type: "select",
+      options: ["0-3 Months", "3-6 Months", "6-12 Months", "1-2 Years", "2-4 Years", "4-6 Years", "6-8 Years", "8-12 Years", "12+ Years"],
+    },
     { key: "gender", label: "Gender", type: "select", options: ["Boys", "Girls", "Unisex"] },
     MATERIAL_FIELD,
     MRP_FIELD,
     DISCOUNT_FIELD,
     LOW_STOCK_FIELD,
     CRITICAL_STOCK_FIELD,
-    STATUS_FIELD,
+    // No status field here deliberately — the backend defaults new
+    // products to "Pending" (status: status || "Pending"), and letting
+    // a vendor set their own product straight to "Approved" would
+    // bypass whatever moderation that status is meant to represent.
   ],
   // "mobiles" is merged into "electronics" — no separate schema.
 };

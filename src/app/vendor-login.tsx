@@ -17,7 +17,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, radius, spacing } from "@/theme/colors";
 import type { AppDispatch, RootState } from "@/store/store";
 import { vendorEnterEmail } from "@/store/slices/vendorAuthSlice";
-import { resetEmailVerification } from "@/services/vendorVerifiedEmails";
 
 export default function VendorLoginScreen() {
   const router = useRouter();
@@ -33,24 +32,6 @@ export default function VendorLoginScreen() {
     if (vendorEnterEmail.fulfilled.match(result)) {
       router.push(result.payload.alreadyVerified ? "/vendor-password" : "/vendor-otp");
     }
-  };
-
-  const onResetVerification = () => {
-    if (!email.trim()) return;
-    Alert.alert(
-      "Reset OTP Verification",
-      `Forget that ${email.trim()} was already OTP-verified? Next login for this email will ask for the OTP again.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Reset",
-          onPress: async () => {
-            await resetEmailVerification(email.trim());
-            Alert.alert("Done", "Next login with this email will require OTP verification again.");
-          },
-        },
-      ]
-    );
   };
 
   return (
@@ -82,12 +63,6 @@ export default function VendorLoginScreen() {
               autoFocus
             />
           </View>
-
-          {email.trim().length > 0 && (
-            <Pressable onPress={onResetVerification} hitSlop={8} style={{ marginBottom: spacing.md }}>
-              <Text style={styles.resetLink}>Testing: reset OTP verification for this email</Text>
-            </Pressable>
-          )}
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
         </View>

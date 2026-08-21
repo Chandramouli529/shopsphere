@@ -1,18 +1,24 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useMemo, useState } from "react";
-import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, radius, spacing, typography } from "@/theme/colors";
 import type { AppDispatch, RootState } from "@/store/store";
-import { blockUser, unblockUser, deleteUser, type RegisteredUser } from "@/store/slices/usersSlice";
+import { fetchUsers, blockUser, unblockUser, deleteUser, type RegisteredUser } from "@/store/slices/usersSlice";
 
 const ADMIN_COLOR = "#6c2eb5";
 
 export default function AdminUsersScreen() {
   const dispatch = useDispatch<AppDispatch>();
   const users = useSelector((state: RootState) => state.users.users);
+  const fetchStatus = useSelector((state: RootState) => state.users.fetchStatus);
+  const fetchError = useSelector((state: RootState) => state.users.fetchError);
   const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    dispatch(fetchUsers());
+  }, [dispatch]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -66,7 +72,20 @@ export default function AdminUsersScreen() {
         )}
       </View>
 
-      {filtered.length === 0 ? (
+      {fetchStatus === "loading" && users.length === 0 ? (
+        <View style={styles.emptyWrap}>
+          <ActivityIndicator size="large" color={ADMIN_COLOR} />
+          <Text style={styles.emptyText}>Loading users…</Text>
+        </View>
+      ) : fetchStatus === "failed" && users.length === 0 ? (
+        <View style={styles.emptyWrap}>
+          <Ionicons name="alert-circle-outline" size={40} color="#c0392b" />
+          <Text style={styles.emptyText}>{fetchError ?? "Could not load users."}</Text>
+          <Pressable style={styles.retryBtn} onPress={() => dispatch(fetchUsers())}>
+            <Text style={styles.retryBtnText}>Retry</Text>
+          </Pressable>
+        </View>
+      ) : filtered.length === 0 ? (
         <View style={styles.emptyWrap}>
           <Ionicons name="people-outline" size={40} color="#bbb" />
           <Text style={styles.emptyText}>{users.length === 0 ? "No users registered yet." : "No users match your search."}</Text>
@@ -77,6 +96,8 @@ export default function AdminUsersScreen() {
           keyExtractor={(u) => u.id}
           contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xl }}
           ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
+          onRefresh={() => dispatch(fetchUsers())}
+          refreshing={fetchStatus === "loading"}
           renderItem={({ item }) => (
             <View style={styles.card}>
               <View style={styles.avatar}>
@@ -139,7 +160,9 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 13, color: colors.ink, padding: 0 },
   emptyWrap: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.md },
-  emptyText: { fontSize: 13, color: colors.inkSoft },
+  emptyText: { fontSize: 13, color: colors.inkSoft, textAlign: "center", paddingHorizontal: spacing.xl },
+  retryBtn: { backgroundColor: ADMIN_COLOR, paddingHorizontal: spacing.lg, paddingVertical: 10, borderRadius: radius.sm },
+  retryBtnText: { color: "#fff", fontWeight: "700", fontSize: 13 },
   card: {
     flexDirection: "row",
     alignItems: "center",

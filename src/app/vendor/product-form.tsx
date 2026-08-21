@@ -99,8 +99,11 @@ export default function VendorProductFormScreen() {
     const priceNum = parseFloat(price);
     const stockNum = parseInt(stock, 10);
     if (!title.trim()) return setError("Product title is required.");
+    if (!description.trim()) return setError("Description is required.");
     if (!priceNum || priceNum <= 0) return setError("Enter a valid price.");
     if (isNaN(stockNum) || stockNum < 0) return setError("Enter a valid stock quantity.");
+    const missingRequired = categoryAttributes.find((f) => f.required && !attributes[f.key]?.trim());
+    if (missingRequired) return setError(`${missingRequired.label} is required.`);
     setError(null);
 
     if (isEdit && existing) {
@@ -199,7 +202,7 @@ export default function VendorProductFormScreen() {
                 if (field.key === "subCategory" && (SUBCATEGORIES_BY_CATEGORY[category]?.length ?? 0) > 0) {
                   return (
                     <View key={field.key} style={{ marginBottom: spacing.md }}>
-                      <Text style={styles.inputLbl}>{field.label}</Text>
+                      <Text style={styles.inputLbl}>{field.label}{field.required ? " *" : ""}</Text>
                       <View style={styles.selectRow}>
                         {SUBCATEGORIES_BY_CATEGORY[category].map((sub) => {
                           const isActive = attributes.subCategory === sub.label;
@@ -285,7 +288,7 @@ function AttributeInput({
   if (field.type === "select") {
     return (
       <View style={{ marginBottom: spacing.md }}>
-        <Text style={styles.inputLbl}>{field.label}</Text>
+        <Text style={styles.inputLbl}>{field.label}{field.required ? " *" : ""}</Text>
         <View style={styles.selectRow}>
           {(field.options ?? []).map((opt) => {
             const isActive = value === opt;
@@ -305,7 +308,7 @@ function AttributeInput({
   }
   return (
     <Field
-      label={field.label}
+      label={field.label + (field.required ? " *" : "")}
       value={value}
       onChangeText={onChange}
       placeholder={field.placeholder}

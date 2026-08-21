@@ -15,10 +15,12 @@ export interface VendorSession {
 
 interface VendorAuthState {
   /** "email" = entering email (default screen). "otp" = first-time
-   * vendor, verifying the OTP admin sent when their account was created
-   * — reached BEFORE password entry, only once per vendor ever.
-   * "password" = entering password — reached either right after email
-   * (returning vendor, already verified before) or right after OTP
+   * vendor on this device, verifying the OTP admin sent when their
+   * account was created — reached BEFORE password entry, only once per
+   * vendor email per device (tracked locally, since there's no backend
+   * endpoint to check verification status ahead of login). "password"
+   * = entering password — reached either right after email (returning
+   * vendor, already verified on this device before) or right after OTP
    * verification succeeds (first-time vendor). */
   step: "email" | "otp" | "password";
   pendingEmail: string | null;
@@ -45,7 +47,7 @@ const initialState: VendorAuthState = {
 // so it keeps working if the shape ever changes back.
 function mapVendorSession(vendor: VendorData): VendorSession {
   return {
-    id: vendor._id,
+    id: vendor.vendorId || vendor._id || vendor.id || "",
     businessName: vendor.shopName || vendor.businessName || "",
     ownerName: vendor.ownerName || [vendor.firstName, vendor.lastName].filter(Boolean).join(" "),
     vendorName: vendor.vendorName || "",
@@ -58,7 +60,7 @@ function mapVendorSession(vendor: VendorData): VendorSession {
 /** Step 1: enters email only. No network call here — there's no "send
  * OTP" endpoint, since the OTP was already emailed to the vendor by
  * admin when their account was created. Checks whether this email has
- * already completed OTP verification before (locally tracked): if so,
+ * already completed OTP verification before on this device: if so,
  * skips straight to the password step; otherwise moves to OTP entry. */
 export const vendorEnterEmail = createAsyncThunk("vendorAuth/enterEmail", async (email: string, { rejectWithValue }) => {
   const trimmed = email.trim();

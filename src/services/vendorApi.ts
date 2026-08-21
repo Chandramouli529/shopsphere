@@ -26,7 +26,13 @@ vendorApiClient.interceptors.request.use(async (config) => {
 });
 
 export interface VendorData {
-  _id: string;
+  /** Confirmed real field name from an actual /vendor/login response
+   * dump — the vendor's own id comes back as `vendorId`, not `_id`.
+   * `_id`/`id` are kept as fallbacks in case the shape ever varies by
+   * endpoint (e.g. a future /vendor/profile). */
+  vendorId?: string;
+  _id?: string;
+  id?: string;
   businessName?: string;
   shopName?: string;
   ownerName?: string;
